@@ -19,15 +19,16 @@ Importer.loadQtBinding( "qt.core" );
 Importer.loadQtBinding( "qt.gui" );
 
 /*
-to- do
+to-do
 make Delete key delete labels selected
-make deletion be deferred until Save
-make the labeler operate on the currently playing song, when invoked with global shortcut
-(label currently playing song command)
+make deletion and addition of labels be deferred until Save
 make the labeler gain the feature adding menu entries setting / clearing specific labels on songs
 make labels added to songs be represented in the playlist
 make labeler search for specific labeled songs in the collection browser / add to playlist / replace playlist
+make labeler generate m3u playlists
+make decorator so as to avoid the try catch everywhere
 */
+
 function basename(path) {
     return path.replace(/\\/g,'/').replace( /.*\//, '' );
 }
@@ -355,6 +356,21 @@ function ManageLabels(filenames) {
 		}
 	}
 
+	removeButton = new QPushButton("&Delete selected labels immediately",dialog);
+	function xRemoveSelectedItems() {
+		items = listview.selectedItems();
+		for (i in items) {
+			label = items[i].text(0);
+			id = mgr.getLabelID(label);
+			mgr.deleteLabel(label);
+			listview.invisibleRootItem().removeChild(items[i])
+		}
+	}
+	removeButton.clicked.connect(
+		function() { try { xRemoveSelectedItems(); } catch (e) { Amarok.alert(e); } }
+	);
+	layout.addWidget(removeButton,0,0);
+
 	buttonBox = new QDialogButtonBox(QDialogButtonBox.StandardButtons(QDialogButtonBox.Save|QDialogButtonBox.Discard),Qt.Horizontal,layout);
 	layout.addWidget(buttonBox,0,0);
 	
@@ -369,19 +385,12 @@ function ManageLabels(filenames) {
 	);
 	buttonBox.button(QDialogButtonBox.Discard).clicked.connect( dialog.reject );
 	
-	removeButton = new QPushButton("&Delete label",buttonBox);
-	function xRemoveSelectedItems() {
-		items = listview.selectedItems();
-		for (i in items) {
-			label = items[i].text(0);
-			id = mgr.getLabelID(label);
-			mgr.deleteLabel(label);
-			listview.invisibleRootItem().removeChild(items[i])
-		}
+	helpButton = new QPushButton("&Help",buttonBox);
+	function help() {
+		readme = Amarok.Info.scriptPath() + "/README";
+		QProcess.startDetached("xdg-open", [readme]);
 	}
-	removeButton.clicked.connect(
-		function() { try { xRemoveSelectedItems(); } catch (e) { Amarok.alert(e); } }
-	);
+	helpButton.clicked.connect(help);
 
 	dialog.accepted.connect(
 		function() {
@@ -422,7 +431,7 @@ function ManageLabelsOnPlayingTrack() {
 }
 
 Amarok.Window.addToolsSeparator();
-Amarok.Window.addToolsMenu( "ManageLabelsOnSelectedTracks", "Manage labels of selected tracks", "folder" );
-Amarok.Window.addToolsMenu( "ManageLabelsOnPlayingTrack", "Manage labels of playing track", "folder" );
+Amarok.Window.addToolsMenu( "ManageLabelsOnSelectedTracks", "Manage labels on selected tracks", "folder" );
+Amarok.Window.addToolsMenu( "ManageLabelsOnPlayingTrack", "Manage labels on playing track", "folder" );
 Amarok.Window.ToolsMenu.ManageLabelsOnSelectedTracks['triggered()'].connect(ManageLabelsOnSelectedTracks);
 Amarok.Window.ToolsMenu.ManageLabelsOnPlayingTrack['triggered()'].connect(ManageLabelsOnPlayingTrack);
