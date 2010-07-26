@@ -58,12 +58,23 @@ DoesntExist.prototype.toString = function () {
 	return this.msg;
 };
 
+/* FIXME:
+ * invalidate caches if something in collection has been detected to change!
+ * invalidate caches if ANOTHER labelmanager has made modifications too
+ * perhaps the way to deal with this is to have a shared global cache
+ * also if we are going to do that, we might bother to make signals and slots
+ * so when labels are modified, consumer UIs are updated
+ */
 function LabelManager() {
-	this.labels = null;
-	this.track_cache = new Array();
-	this.label_cache = new Array();
-	this.urls_labels_cache = new Array();
+	this.invalidate_label_list();
+	this.invalidate_track_cache();
+	this.invalidate_label_cache();
+	this.invalidate_urls_labels_cache();
 }
+LabelManager.prototype.invalidate_label_list =        function() { this.labels = null; }
+LabelManager.prototype.invalidate_track_cache =       function() { this.label_cache = new Array(); }
+LabelManager.prototype.invalidate_label_cache =       function() { this.label_cache = new Array(); }
+LabelManager.prototype.invalidate_urls_labels_cache = function() { this.urls_labels_cache = new Array(); }
 LabelManager.prototype.warmupFileCache = function(filenames) {
 	if (filenames.length == 0) { return; }
 	keys = new Array(); for (f in filenames) { keys.push("'." + esc(filenames[f]) + "'"); }
@@ -184,7 +195,18 @@ LabelManager.prototype.deleteLabel = function (label) {
 	Amarok.debug("Deleting label " + label);
 	q("delete from urls_labels where label = " + labelid);
 	q("delete from labels where id = " + labelid);
+	this.invalidate_label_list();
+	this.invalidate_label_cache();
+	this.invalidate_urls_labels_cache();
 };
+LabelManager.prototype.getTracksLabeledAs = function (label) {
+	labelid = this.getLabelID(label);
+	res = q("select urls.rpath from urls_labels inner join urls on (urls_labels.url = urls.id) where label = " + labelid);
+	for (i in res) {
+		res[i] = res[i].substr(1);
+	}
+	return res;
+}
 
 var settings = new QSettings( "DragonFear", "labeler" );
 
@@ -356,7 +378,12 @@ function ManageLabels(filenames) {
 		}
 	}
 
-	removeButton = new QPushButton("&Delete selected labels immediately",dialog);
+	var actionbuttons=new QWidget(dialog);
+	var actionbuttonslayout=new QHBoxLayout(layout);
+	actionbuttons.setLayout(actionbuttonslayout);
+	layout.addWidget(actionbuttons,0,0);
+
+	removeButton = new QPushButton("&Delete selected labels immediately",actionbuttons);
 	function xRemoveSelectedItems() {
 		items = listview.selectedItems();
 		for (i in items) {
@@ -369,7 +396,25 @@ function ManageLabels(filenames) {
 	removeButton.clicked.connect(
 		function() { try { xRemoveSelectedItems(); } catch (e) { Amarok.alert(e); } }
 	);
-	layout.addWidget(removeButton,0,0);
+	actionbuttonslayout.addWidget(removeButton,0,0);
+
+// 	exportButton = new QPushButton("&Export selected labels as playlists",actionbuttons);
+// 	function xExportLabels() {
+// 		items = listview.selectedItems();
+// 		for (i in items) {
+// 			label = items[i].text(0);
+// 			fs = mgr.getTracksLabeledAs(label);
+// 			Amarok.alert(fs.join("\n"));
+// 		}
+// 	}
+// 	exportButton.clicked.connect(
+// 		function() { try {
+// 			answer = Amarok.alert("Save changes to labels before exporting?","questionYesNo");
+// 			if (answer == 3) { save(); }
+// 			xExportLabels();
+// 		} catch (e) { Amarok.alert(e); } }
+// 	);
+// 	actionbuttonslayout.addWidget(exportButton,0,0);
 
 	buttonBox = new QDialogButtonBox(QDialogButtonBox.StandardButtons(QDialogButtonBox.Save|QDialogButtonBox.Discard),Qt.Horizontal,layout);
 	layout.addWidget(buttonBox,0,0);
@@ -425,7 +470,6 @@ function ManageLabelsOnSelectedTracks() {
 
 function ManageLabelsOnPlayingTrack() {
 	currentTrack = Amarok.Engine.currentTrack();
-	Amarok.debug(currentTrack.path);
 	if (currentTrack.path) { return ManageLabels([currentTrack.path]); }
 	else { Amarok.alert("Please start playback"); }
 }
