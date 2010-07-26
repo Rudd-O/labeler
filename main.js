@@ -72,7 +72,7 @@ function LabelManager() {
 	this.invalidate_urls_labels_cache();
 }
 LabelManager.prototype.invalidate_label_list =        function() { this.labels = null; }
-LabelManager.prototype.invalidate_track_cache =       function() { this.label_cache = new Array(); }
+LabelManager.prototype.invalidate_track_cache =       function() { this.track_cache = new Array(); }
 LabelManager.prototype.invalidate_label_cache =       function() { this.label_cache = new Array(); }
 LabelManager.prototype.invalidate_urls_labels_cache = function() { this.urls_labels_cache = new Array(); }
 LabelManager.prototype.warmupFileCache = function(filenames) {
