@@ -26,7 +26,7 @@ make the labeler gain the feature adding menu entries setting / clearing specifi
 make labels added to songs be represented in the playlist
 make labeler search for specific labeled songs in the collection browser / add to playlist / replace playlist
 make labeler generate m3u playlists
-make decorator so as to avoid the try catch everywhere
+make decorator so as to avoid the try catch everywhere: http://www.sitepoint.com/blogs/2008/11/11/arguments-a-javascript-oddity/
 */
 
 function basename(path) {
