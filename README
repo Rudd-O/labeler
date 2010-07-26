@@ -1,0 +1,17 @@
+This script lets you manage labels of the tracks in your playlist very quickly.  It is optimized for both keyboard and mouse operation.
+
+To use it, select a few tracks in your playlist, click the Tools menu, and select Manage labels of selected tracks.  A dialog will open with a list of labels that you can check or uncheck.  Check or uncheck the checkboxes on the labels to add / remove labels on the selected tracks.  You can also expand a label to modify the labels of particular tracks.
+
+-------------------------------
+
+The search box atop is quite useful.  If you type text, the label list will be filtered to show only the labels that contain said text.  At this point:
+
+1. If the text you typed matches only one label on the list, hitting ENTER will check the checkbox on said label and clear the filter box.
+2. If, however, the text you typed matches more than one label, or matches no labels at all, hitting ENTER will add a new label named after the text, check the checkbox on the new label, and clear the filter box.
+3. If the text box is empty, hitting ENTER will save all changes you've made and close the labeler dialog.
+
+In essence, this means that, if you type a few letters of the label you want to add to the tracks, and hit ENTER, the label will be added to the files.  Immediately hitting ENTER a second time will save your changes.  By example: assuming you have a label called "Sync to iPhone", you open the dialog, type "iph", hit ENTER twice quickly, all the selected tracks will now be labeled "Sync to iPhone".
+
+-------------------------------
+
+You can also delete any selected labels using the button "Delete label" at the bottom of the dialog.  Be ware that the label removal takes effect *immediately*, and all tracks labeled with that label will be unlabeled, regardless of whether you later click Save or Close without Saving.
