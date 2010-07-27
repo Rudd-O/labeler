@@ -33,6 +33,10 @@ function basename(path) {
     return path.replace(/\\/g,'/').replace( /.*\//, '' );
 }
 
+function dirname(path) {
+    return path.replace(/\\/g,'/').replace(/\/[^\/]*$/, '');
+}
+
 function inArray (arr,value) {
 	var i;
 	for (i=0; i < arr.length; i++) { if (arr[i] == value) { return true; } }
@@ -43,7 +47,41 @@ function q(s) {
 	Amarok.debug("SQL query: " + s);
 	return Amarok.Collection.query(s);
 } 
+
+function path2rpath(p) { return "." + p; }
+
+function rpath2path(p) { return p.substr(1); }
+
 function esc(s) { return Amarok.Collection.escape(s); }
+
+function quotestr(s) { return "'" + Amarok.Collection.escape(s) + "'"; }
+
+function map(func, array) {
+	var r = new Array();
+	var l = array.length;
+	for ( var i = 0; i < l ; i++ ) { r.push(func(array[i])); }
+	return r;
+}
+
+function filter(func, array) {
+	var r = new Array();
+	var l = array.length;
+	for ( var i = 0; i < l ; i++ ) {
+		if (func(array[i])) { r.push(array[i]); }
+	}
+	return r;
+}
+
+function batch(array,batchSize) {
+	var result = new Array();
+	var l = array.length;
+	for (var i = 0; i < l; i++) {
+		var stride = Math.floor(i / batchSize);
+		if (result[stride] === undefined) { result[stride] = new Array(); }
+		result[stride].push(array[i]);
+	}
+	return result;
+}
 
 function AlreadyExists(msg) {
 	this.msg = msg;
@@ -95,65 +133,41 @@ LabelManager.prototype.revalidate_urls_labels_cache = function() {
 	}
 }
 LabelManager.prototype.warmupFileCache = function(filenames) {
-	keys = new Array();
-	for (f in filenames) {
-		if (LabelManager.track_cache[filenames[f]] === undefined) {
-			keys.push("'." + esc(filenames[f]) + "'");
-		}
-	}
+	function incache(f) { return LabelManager.track_cache[f] === undefined; }
+	var keys = map( function(f) { return quotestr(path2rpath(f)); } , filter( incache, filenames ) );
 	if (keys.length == 0) { return; }
-	query = "select id,rpath from urls where rpath in ("+keys.join(",")+")";
-	res = q(query);
-	if (keys.length * 2 != res.length) {
-		throw "Unexpected keys.length != ids.length: " + keys.length + " " + res.length;
+	var query = "select id,rpath from urls where rpath in ("+keys.join(",")+")";
+	var res = batch(q(query),2);
+	if (keys.length != res.length) {
+		throw "Unexpected keys.length != res.length: " + keys.length + " " + res.length;
 	}
-	for (i in keys) {
-		i = i * 2;
-		id = res[i];
-		filename = res[i+1].substr(1);
-		LabelManager.track_cache[filename] = id;
-	}
+	for (var i in res) { LabelManager.track_cache[rpath2path(res[i][1])] = res[i][0]; }
 };
 LabelManager.prototype.warmupLabelCache = function(labels) {
-	keys = new Array();
-	for (f in labels) {
-		if (LabelManager.label_cache[labels[f]] === undefined) {
-			keys.push("'" + esc(labels[f]) + "'");
-		}
-	}
+	function incache(f) { return LabelManager.label_cache[f] === undefined; }
+	var keys = map( quotestr, filter( incache, labels ) );
 	if (keys.length == 0) { return; }
-	query = "select id,label from labels where label in ("+keys.join(",")+")";
-	res = q(query);
-	if (keys.length * 2 != res.length) {
-		throw "Unexpected keys.length != ids.length: " + keys.length + " " + res.length;
+	var query = "select id,label from labels where label in ("+keys.join(",")+")";
+	var res = batch(q(query),2);
+	if (keys.length != res.length) {
+		throw "Unexpected keys.length != res.length: " + keys.length + " " + res.length;
 	}
-	for (i in keys) {
-		i = i * 2;
-		id = res[i];
-		label = res[i+1];
-		LabelManager.label_cache[label] = id;
-	}
+	for (var i in res) { LabelManager.label_cache[res[i][1]] = res[i][0]; }
 };
 LabelManager.prototype.warmupUrlsLabelsCache = function(filenames,labels) {
 	if (filenames.length == 0) { return; }
 	if (labels.length == 0) { return; }
-	query = "select CONCAT(url,',',label) from urls_labels";
-	res = q(query);
-	query = "select label from urls_labels";
-	for (i in filenames) {
-		urlid = this.getTrackID(filenames[i]);
-		for (j in labels) {
-			labelid = this.getLabelID(labels[j]);
+	for (var i in filenames) {
+		var urlid = this.getTrackID(filenames[i]);
+		for (var j in labels) {
+			var labelid = this.getLabelID(labels[j]);
 			if (LabelManager.urls_labels_cache[urlid+ "," + labelid] === undefined) {
-// 				Amarok.debug("ULC: Setting "+ urlid+ "," + labelid + " to false");
 				LabelManager.urls_labels_cache[urlid+ "," + labelid] = false;
 			}
 		}
 	}
-	for (i in res) {
-// 		Amarok.debug("ULC: Setting "+ res[i] + " to true");
-		LabelManager.urls_labels_cache[res[i]] = true;
-	}
+	var keys = q("select CONCAT(url,',',label) from urls_labels");
+	map( function(key) { LabelManager.urls_labels_cache[key] = true; } , keys );
 };
 LabelManager.prototype.getLabels = function() {
 	return q("select label from labels");
@@ -161,7 +175,7 @@ LabelManager.prototype.getLabels = function() {
 LabelManager.prototype.getTrackID = function(filename) {
 	if (!LabelManager.track_cache[filename]) {
 		Amarok.debug("Initializing track cache for "+filename);
-		query = "select id from urls where rpath = '" + esc("." + filename) + "'";
+		query = "select id from urls where rpath = " + quotestr(path2rpath(filename));
 		id = q(query)[0];
 		if (!id) { throw filename + ' does not have an associated track ID'; }
 		LabelManager.track_cache[filename] = id;
@@ -172,7 +186,7 @@ LabelManager.prototype.getTrackID = function(filename) {
 LabelManager.prototype.getLabelID = function (label) {
 	if (!LabelManager.label_cache[label]) {
 		Amarok.debug("Initializing label cache for "+label);
-		query = "select id from labels where label = '" + esc(label) + "'";
+		query = "select id from labels where label = " + quotestr(label);
 		id = q(query)[0];
 		if (!id) { throw label + ' does not have an associated label ID'; }
 		LabelManager.label_cache[label] = id;
@@ -215,7 +229,7 @@ LabelManager.prototype.createLabel = function (label) {
 		if (e instanceof AlreadyExists) { throw e; }
 		else {
 			Amarok.debug("Creating label " + label);
-			q("insert into labels (label) values('" + esc(label) + "')");
+			q("insert into labels (label) values(" + quotestr(label) + ")");
 			this.revalidate_label_cache();
 			this.revalidate_urls_labels_cache();
 		}
@@ -236,10 +250,7 @@ LabelManager.prototype.deleteLabel = function (label) {
 LabelManager.prototype.getTracksLabeledAs = function (label) {
 	labelid = this.getLabelID(label);
 	res = q("select urls.rpath from urls_labels inner join urls on (urls_labels.url = urls.id) where label = " + labelid);
-	for (i in res) {
-		res[i] = res[i].substr(1);
-	}
-	return res;
+	return map( rpath2path , res );
 }
 
 var settings = new QSettings( "DragonFear", "labeler" );
@@ -279,38 +290,33 @@ function ManageLabels(filenames) {
 	listview.setHeaderLabel("Label");
 	layout.addWidget(listview,0,0);
 	
-	function addLabelItem(label) {
+	function addLabelItem(label,fs) {
 		labelitem = new QTreeWidgetItem(listview);
 		labelitem.setText(0,label);
 		labelitem.setFlags (Qt.ItemFlags(Qt.ItemIsTristate | Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable ));
 		labelitem.setCheckState(0,Qt.Unchecked);
 		listview.addTopLevelItem(labelitem);
-		if (filenames.length < 50 && filenames.length > 1) {
-			for (j in filenames) {
+		if (fs.length < 50 && fs.length > 1) {
+			map( function(f) {
 				fileitem = new QTreeWidgetItem(labelitem);
-				fileitem.setText(0,basename(filenames[j]));
-				fileitem.setText(1,filenames[j]);
+				fileitem.setText(0,basename(f));
+				fileitem.setText(1,f);
 				fileitem.setFlags (Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable ));
-				if (mgr.labeled(filenames[j],labels[i])) { fileitem.setCheckState(0,Qt.Checked); }
+				if (mgr.labeled(f,label)) { fileitem.setCheckState(0,Qt.Checked); }
 				else { fileitem.setCheckState(0,Qt.Unchecked); }
 				labelitem.addChild(fileitem);
-			}
+			} , fs );
 		}
 		else {
-			z = 0;
-			for (j in filenames) {
-				if (mgr.labeled(filenames[j],labels[i])) { z = z + 1; }
-			}
-			if (z == filenames.length) { labelitem.setCheckState(0,Qt.Checked); }
-			else if (z > 0) { labelitem.setCheckState(0,Qt.PartiallyChecked); }
+			labeled = filter( function(x) { return mgr.labeled(x,label); } , fs );
+			if (labeled.length == fs.length) { labelitem.setCheckState(0,Qt.Checked); }
+			else if (labeled.length > 0) { labelitem.setCheckState(0,Qt.PartiallyChecked); }
 			else { labelitem.setCheckState(0,Qt.Unchecked); }
 		}
 		return labelitem;
 	}
 	
-	for (i in labels) {
-		labelitem = addLabelItem(labels[i]);
-	}
+	map( function(l) { return addLabelItem(l,filenames); } , labels );
 
 	var filterlabel=new QLabel("Filter:",filteraddbox);
 	filteraddboxlayout.addWidget(filterlabel,0,0);
@@ -320,7 +326,7 @@ function ManageLabels(filenames) {
 	function createLabelAndClearInput() {
 		if (!filteredit.text) { throw "Please input a label name"; }
 		mgr.createLabel(filteredit.text);
-		labelitem = addLabelItem(filteredit.text);
+		labelitem = addLabelItem(filteredit.text,filenames);
 		labelitem.setSelected(true);
 		labelitem.setCheckState(0,Qt.Checked);
 		filteredit.setText("");
@@ -328,12 +334,12 @@ function ManageLabels(filenames) {
 	function deleteSelectedLabels() {
 		items = listview.selectedItems();
 		if (items.length == 0) { throw "Please select at least one label"; }
-		for (i in items) {
-			label = items[i].text(0);
+		map ( function(item) {
+			label = item.text(0);
 			id = mgr.getLabelID(label);
 			mgr.deleteLabel(label);
-			listview.invisibleRootItem().removeChild(items[i])
-		}
+			listview.invisibleRootItem().removeChild(item)
+			} , items );
 	}
 	
 	filteredit.placeholderText = "Search or add new label";
@@ -392,12 +398,10 @@ function ManageLabels(filenames) {
 		for (n = 0; n < listview.invisibleRootItem().childCount(); n++) {
 			labelitem = listview.invisibleRootItem().child(n);
 			label = labelitem.text(0);
-// 			Amarok.debug("Sweeping " + label);
 			if (labelitem.childCount() > 0) {
 				for (j = 0; j < labelitem.childCount(); j++) {
 					fileitem = labelitem.child(j);
 					filename = fileitem.text(1);
-// 					Amarok.debug("   Label: " + filename);
 					if (fileitem.checkState(0) == Qt.Checked) {
 						mgr.addLabel(filename,label);
 					}
@@ -408,12 +412,12 @@ function ManageLabels(filenames) {
 			}
 			else {
 				if (labelitem.checkState(0) == Qt.Checked) {
-					for (i in filenames) { mgr.addLabel(filenames[i],label); }
+					map ( function(f) { mgr.addLabel(f,label); } , filenames );
 				}
 				else if (labelitem.checkState(0) == Qt.PartiallyChecked) {
 				}
 				else {
-					for (i in filenames) { mgr.removeLabel(filenames[i],label); }
+					map ( function(f) { mgr.removeLabel(f,label); } , filenames );
 				}
 			}
 		}
@@ -493,10 +497,7 @@ function ManageLabels(filenames) {
 	  
   } catch(e) {
 	Amarok.alert("Unexpected exception: " + e + ". Check the debug log for info.");
-	for (i in e) {
-		Amarok.debug(i);
-		Amarok.debug(e[i]);
-	}
+	map(Amarok.debug,e);
   }
 }
 
