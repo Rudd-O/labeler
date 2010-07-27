@@ -208,9 +208,6 @@ LabelManager.prototype.labeled = function(filename,label) {
 	}
 	return LabelManager.urls_labels_cache[urlid + "," + labelid];
 };
-/*LabelManager.prototype.unlabeled = function(filename,label) {
-	return !this.labeled(filename.label);
-}*/
 LabelManager.prototype.addLabel = function (filename,label) {
 	if (this.labeled(filename,label)) { return; }
 	Amarok.debug("Adding label " + label + " to file " + filename);
@@ -219,16 +216,11 @@ LabelManager.prototype.addLabel = function (filename,label) {
 };
 /*LabelManager.prototype.addLabelToManyFiles = function (label,arrayoffiles) {
 	var labelid = this.getLabelID(label);
-// 	function unlabeled(f) {
-// 		Amarok.debug(this);
-// 		Amarok.debug(this.labeled);
-// 		if (this.labeled(f,label)) { return false; }
-// 		return true;
-// 	}
-	var filtered = filter ( this.unlabeled , arrayoffiles );
+	function unlabeled(x) { return function(f) { return !x.labeled(f,label); } }
+	var filtered = filter ( unlabeled(this) , arrayoffiles );
 	if (filtered.length == 0) { return; }
 	var urlids = map ( this.getTrackID , filtered );
-	Amarok.debug("Adding label " + label + " to multiple files: " + ids);
+// 	Amarok.debug("Adding label " + label + " to multiple files: " + urlids);
 	var queries = map (
 		function(urlid) {
 			return "insert into urls_labels (url,label) values("+urlid+","+labelid+")";
