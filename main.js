@@ -109,7 +109,7 @@ function LabelManager() {
 	this.revalidate_urls_labels_cache();
 }
 LabelManager.prototype.revalidate_track_cache =       function() {
-	sum = q("select md5(group_concat(rpath)) from urls")[0];
+	var sum = q("select md5(group_concat(rpath)) from urls")[0];
 	if (!(sum == LabelManager.track_cache_sum)) {
 		Amarok.debug("Previous track cache is invalid.  Regenerating. " + LabelManager.track_cache_sum + " " + sum)
 		LabelManager.track_cache = new Array();
@@ -117,7 +117,7 @@ LabelManager.prototype.revalidate_track_cache =       function() {
 	}
 }
 LabelManager.prototype.revalidate_label_cache =       function() {
-	sum = q("select md5(group_concat(label)) from labels")[0];
+	var sum = q("select md5(group_concat(label)) from labels")[0];
 	if (!(sum == LabelManager.label_cache_sum)) {
 		Amarok.debug("Previous label cache is invalid.  Regenerating. " + LabelManager.label_cache_sum + " " + sum)
 		LabelManager.label_cache = new Array();
@@ -125,7 +125,7 @@ LabelManager.prototype.revalidate_label_cache =       function() {
 	}
 }
 LabelManager.prototype.revalidate_urls_labels_cache = function() {
-	sum = q("select md5(group_concat(concat(url,label))) from urls_labels")[0];
+	var sum = q("select md5(group_concat(concat(url,label))) from urls_labels")[0];
 	if (!(sum == LabelManager.urls_labels_cache_sum)) {
 		Amarok.debug("Previous urls_labels cache is invalid.  Regenerating. " + LabelManager.urls_labels_cache_sum + " " + sum)
 		LabelManager.urls_labels_cache = new Array();
