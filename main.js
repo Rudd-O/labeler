@@ -66,18 +66,42 @@ DoesntExist.prototype.toString = function () {
  * so when labels are modified, consumer UIs are updated
  */
 function LabelManager() {
-	this.invalidate_label_list();
-	this.invalidate_track_cache();
-	this.invalidate_label_cache();
-	this.invalidate_urls_labels_cache();
+	this.revalidate_track_cache();
+	this.revalidate_label_cache();
+	this.revalidate_urls_labels_cache();
 }
-LabelManager.prototype.invalidate_label_list =        function() { this.labels = null; }
-LabelManager.prototype.invalidate_track_cache =       function() { this.track_cache = new Array(); }
-LabelManager.prototype.invalidate_label_cache =       function() { this.label_cache = new Array(); }
-LabelManager.prototype.invalidate_urls_labels_cache = function() { this.urls_labels_cache = new Array(); }
+LabelManager.prototype.revalidate_track_cache =       function() {
+	sum = q("select md5(group_concat(rpath)) from urls")[0];
+	if (!(sum == LabelManager.track_cache_sum)) {
+		Amarok.debug("Previous track cache is invalid.  Regenerating. " + LabelManager.track_cache_sum + " " + sum)
+		LabelManager.track_cache = new Array();
+		LabelManager.track_cache_sum = sum;
+	}
+}
+LabelManager.prototype.revalidate_label_cache =       function() {
+	sum = q("select md5(group_concat(label)) from labels")[0];
+	if (!(sum == LabelManager.label_cache_sum)) {
+		Amarok.debug("Previous label cache is invalid.  Regenerating. " + LabelManager.label_cache_sum + " " + sum)
+		LabelManager.label_cache = new Array();
+		LabelManager.label_cache_sum = sum;
+	}
+}
+LabelManager.prototype.revalidate_urls_labels_cache = function() {
+	sum = q("select md5(group_concat(concat(url,label))) from urls_labels")[0];
+	if (!(sum == LabelManager.urls_labels_cache_sum)) {
+		Amarok.debug("Previous urls_labels cache is invalid.  Regenerating. " + LabelManager.urls_labels_cache_sum + " " + sum)
+		LabelManager.urls_labels_cache = new Array();
+		LabelManager.urls_labels_cache_sum = sum;
+	}
+}
 LabelManager.prototype.warmupFileCache = function(filenames) {
-	if (filenames.length == 0) { return; }
-	keys = new Array(); for (f in filenames) { keys.push("'." + esc(filenames[f]) + "'"); }
+	keys = new Array();
+	for (f in filenames) {
+		if (LabelManager.track_cache[filenames[f]] === undefined) {
+			keys.push("'." + esc(filenames[f]) + "'");
+		}
+	}
+	if (keys.length == 0) { return; }
 	query = "select id,rpath from urls where rpath in ("+keys.join(",")+")";
 	res = q(query);
 	if (keys.length * 2 != res.length) {
@@ -87,12 +111,17 @@ LabelManager.prototype.warmupFileCache = function(filenames) {
 		i = i * 2;
 		id = res[i];
 		filename = res[i+1].substr(1);
-		this.track_cache[filename] = id;
+		LabelManager.track_cache[filename] = id;
 	}
 };
 LabelManager.prototype.warmupLabelCache = function(labels) {
-	if (labels.length == 0) { return; }
-	keys = new Array(); for (f in labels) { keys.push("'" + esc(labels[f]) + "'"); }
+	keys = new Array();
+	for (f in labels) {
+		if (LabelManager.label_cache[labels[f]] === undefined) {
+			keys.push("'" + esc(labels[f]) + "'");
+		}
+	}
+	if (keys.length == 0) { return; }
 	query = "select id,label from labels where label in ("+keys.join(",")+")";
 	res = q(query);
 	if (keys.length * 2 != res.length) {
@@ -102,7 +131,7 @@ LabelManager.prototype.warmupLabelCache = function(labels) {
 		i = i * 2;
 		id = res[i];
 		label = res[i+1];
-		this.label_cache[label] = id;
+		LabelManager.label_cache[label] = id;
 	}
 };
 LabelManager.prototype.warmupUrlsLabelsCache = function(filenames,labels) {
@@ -115,63 +144,67 @@ LabelManager.prototype.warmupUrlsLabelsCache = function(filenames,labels) {
 		urlid = this.getTrackID(filenames[i]);
 		for (j in labels) {
 			labelid = this.getLabelID(labels[j]);
-			this.urls_labels_cache[urlid+ "," + labelid] = false;
+			if (LabelManager.urls_labels_cache[urlid+ "," + labelid] === undefined) {
+// 				Amarok.debug("ULC: Setting "+ urlid+ "," + labelid + " to false");
+				LabelManager.urls_labels_cache[urlid+ "," + labelid] = false;
+			}
 		}
 	}
 	for (i in res) {
-		this.urls_labels_cache[res[i]] = true;
+// 		Amarok.debug("ULC: Setting "+ res[i] + " to true");
+		LabelManager.urls_labels_cache[res[i]] = true;
 	}
 };
 LabelManager.prototype.getLabels = function() {
-	if (this.labels === null) { this.labels = q("select label from labels"); }
-	return this.labels;
+	return q("select label from labels");
 };
 LabelManager.prototype.getTrackID = function(filename) {
-	if (!this.track_cache[filename]) {
+	if (!LabelManager.track_cache[filename]) {
 		Amarok.debug("Initializing track cache for "+filename);
 		query = "select id from urls where rpath = '" + esc("." + filename) + "'";
 		id = q(query)[0];
 		if (!id) { throw filename + ' does not have an associated track ID'; }
-		this.track_cache[filename] = id;
+		LabelManager.track_cache[filename] = id;
 		return id;
 	}
-	return this.track_cache[filename];
+	return LabelManager.track_cache[filename];
 };
 LabelManager.prototype.getLabelID = function (label) {
-	if (!this.label_cache[label]) {
+	if (!LabelManager.label_cache[label]) {
 		Amarok.debug("Initializing label cache for "+label);
 		query = "select id from labels where label = '" + esc(label) + "'";
 		id = q(query)[0];
 		if (!id) { throw label + ' does not have an associated label ID'; }
-		this.label_cache[label] = id;
+		LabelManager.label_cache[label] = id;
 		return id;
 	}
-	return this.label_cache[label];
+	return LabelManager.label_cache[label];
 };
 LabelManager.prototype.labeled = function(filename,label) {
 	urlid = this.getTrackID(filename);
 	labelid = this.getLabelID(label);
-	if (this.urls_labels_cache[urlid+ "," + labelid] === undefined) {
+	if (LabelManager.urls_labels_cache[urlid+ "," + labelid] === undefined) {
+		Amarok.debug("Initializing urls_labels cache for " + urlid + "," + labelid);
 		query = "select label from urls_labels where url = " + urlid + " and label = " + labelid;
 		id = q(query)[0];
 		if (id) { id = true; }
 		else { id = false };
-		this.urls_labels_cache[urlid + "," + labelid] = id;
+		LabelManager.urls_labels_cache[urlid + "," + labelid] = id;
 		return id;
 	}
-	return this.urls_labels_cache[urlid + "," + labelid];
+	return LabelManager.urls_labels_cache[urlid + "," + labelid];
 };
 LabelManager.prototype.addLabel = function (filename,label) {
 	if (this.labeled(filename,label)) { return; }
 	Amarok.debug("Adding label " + label + " to file " + filename);
 	q("insert into urls_labels (url,label) values("+this.getTrackID(filename)+","+this.getLabelID(label)+")");
-	this.urls_labels_cache[this.getTrackID(filename) + "," + this.getLabelID(label)] = true;
+	LabelManager.urls_labels_cache[this.getTrackID(filename) + "," + this.getLabelID(label)] = true;
 };
 LabelManager.prototype.removeLabel = function (filename,label) {
 	if (!this.labeled(filename,label)) { return; }
 	Amarok.debug("Removing label " + label + " from file " + filename);
 	q("delete from urls_labels where url = "+this.getTrackID(filename)+" and label = "+this.getLabelID(label));
-	this.urls_labels_cache[this.getTrackID(filename) + "," + this.getLabelID(label)] = false;
+	LabelManager.urls_labels_cache[this.getTrackID(filename) + "," + this.getLabelID(label)] = false;
 };
 LabelManager.prototype.createLabel = function (label) {
 	try {
@@ -183,6 +216,8 @@ LabelManager.prototype.createLabel = function (label) {
 		else {
 			Amarok.debug("Creating label " + label);
 			q("insert into labels (label) values('" + esc(label) + "')");
+			this.revalidate_label_cache();
+			this.revalidate_urls_labels_cache();
 		}
 	}
 };
@@ -195,9 +230,8 @@ LabelManager.prototype.deleteLabel = function (label) {
 	Amarok.debug("Deleting label " + label);
 	q("delete from urls_labels where label = " + labelid);
 	q("delete from labels where id = " + labelid);
-	this.invalidate_label_list();
-	this.invalidate_label_cache();
-	this.invalidate_urls_labels_cache();
+	this.revalidate_label_cache();
+	this.revalidate_urls_labels_cache();
 };
 LabelManager.prototype.getTracksLabeledAs = function (label) {
 	labelid = this.getLabelID(label);
@@ -218,8 +252,8 @@ function ManageLabels(filenames) {
 
 	labels = mgr.getLabels();
 
-	mgr.warmupFileCache(filenames);
 	mgr.warmupLabelCache(labels);
+	mgr.warmupFileCache(filenames);
 	mgr.warmupUrlsLabelsCache(filenames,labels);
 
 	var dialog=new QDialog(this);
@@ -251,12 +285,6 @@ function ManageLabels(filenames) {
 		labelitem.setFlags (Qt.ItemFlags(Qt.ItemIsTristate | Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable ));
 		labelitem.setCheckState(0,Qt.Unchecked);
 		listview.addTopLevelItem(labelitem);
-		return labelitem;
-	}
-	
-	for (i in labels) {
-		Amarok.debug("Constructing " + labels[i]);
-		labelitem = addLabelItem(labels[i]);
 		if (filenames.length < 50 && filenames.length > 1) {
 			for (j in filenames) {
 				fileitem = new QTreeWidgetItem(labelitem);
@@ -277,12 +305,37 @@ function ManageLabels(filenames) {
 			else if (z > 0) { labelitem.setCheckState(0,Qt.PartiallyChecked); }
 			else { labelitem.setCheckState(0,Qt.Unchecked); }
 		}
+		return labelitem;
+	}
+	
+	for (i in labels) {
+		labelitem = addLabelItem(labels[i]);
 	}
 
 	var filterlabel=new QLabel("Filter:",filteraddbox);
 	filteraddboxlayout.addWidget(filterlabel,0,0);
 	
 	var filteredit=new QLineEdit(filteraddbox);
+	
+	function createLabelAndClearInput() {
+		if (!filteredit.text) { throw "Please input a label name"; }
+		mgr.createLabel(filteredit.text);
+		labelitem = addLabelItem(filteredit.text);
+		labelitem.setSelected(true);
+		labelitem.setCheckState(0,Qt.Checked);
+		filteredit.setText("");
+	}
+	function deleteSelectedLabels() {
+		items = listview.selectedItems();
+		if (items.length == 0) { throw "Please select at least one label"; }
+		for (i in items) {
+			label = items[i].text(0);
+			id = mgr.getLabelID(label);
+			mgr.deleteLabel(label);
+			listview.invisibleRootItem().removeChild(items[i])
+		}
+	}
+	
 	filteredit.placeholderText = "Search or add new label";
 	filteredit.textChanged.connect(
 		function (newtext) {
@@ -299,29 +352,17 @@ function ManageLabels(filenames) {
 			}
 		}
 	);
-	function xCreateLabel(text) {
-		if (!text) { throw "Please input a label name"; }
-		mgr.createLabel(text);
-		labelitem = addLabelItem(text);
-		labelitem.setSelected(true);
-		labelitem.setCheckState(0,Qt.Checked);
-	}
 	filteredit.returnPressed.connect(
 		function () {
 			try {
 				if (filteredit.text) {
 					items = listview.findItems(filteredit.text,Qt.MatchContains,0);
-					if (items.length == 0) {
-						xCreateLabel(filteredit.text);
-						filteredit.setText("");
-					}
-					else if (items.length == 1) {
+					if (items.length == 1) {
 						items[0].setCheckState(0,Qt.Checked);
 						filteredit.setText("");
 					}
 					else {
-						xCreateLabel(filteredit.text);
-						filteredit.setText("");
+						createLabelAndClearInput();
 					}
 				}
 				else {
@@ -339,8 +380,7 @@ function ManageLabels(filenames) {
 	addbutton.clicked.connect(
 		function () {
 			try {
-				createLabelAndClearInput(filteredit.text);
-				filteredit.setText("");
+				createLabelAndClearInput();
 			} catch (e) {
 				Amarok.alert(e);
 			}
@@ -352,7 +392,6 @@ function ManageLabels(filenames) {
 		for (n = 0; n < listview.invisibleRootItem().childCount(); n++) {
 			labelitem = listview.invisibleRootItem().child(n);
 			label = labelitem.text(0);
-			Amarok.debug("Sweeping " + label);
 			if (labelitem.childCount > 0) {
 				for (j = 0; j < labelitem.childCount(); j++) {
 					fileitem = labelitem.child(j);
@@ -384,17 +423,11 @@ function ManageLabels(filenames) {
 	layout.addWidget(actionbuttons,0,0);
 
 	removeButton = new QPushButton("&Delete selected labels immediately",actionbuttons);
-	function xRemoveSelectedItems() {
-		items = listview.selectedItems();
-		for (i in items) {
-			label = items[i].text(0);
-			id = mgr.getLabelID(label);
-			mgr.deleteLabel(label);
-			listview.invisibleRootItem().removeChild(items[i])
-		}
-	}
 	removeButton.clicked.connect(
-		function() { try { xRemoveSelectedItems(); } catch (e) { Amarok.alert(e); } }
+		function() {
+			try { deleteSelectedLabels(); }
+			catch (e) { Amarok.alert(e); }
+		}
 	);
 	actionbuttonslayout.addWidget(removeButton,0,0);
 
@@ -457,7 +490,11 @@ function ManageLabels(filenames) {
 	dialog.show();
 	  
   } catch(e) {
-	Amarok.alert(e);
+	Amarok.alert("Unexpected exception: " + e + ". Check the debug log for info.");
+	for (i in e) {
+		Amarok.debug(i);
+		Amarok.debug(e[i]);
+	}
   }
 }
 
