@@ -392,10 +392,12 @@ function ManageLabels(filenames) {
 		for (n = 0; n < listview.invisibleRootItem().childCount(); n++) {
 			labelitem = listview.invisibleRootItem().child(n);
 			label = labelitem.text(0);
-			if (labelitem.childCount > 0) {
+// 			Amarok.debug("Sweeping " + label);
+			if (labelitem.childCount() > 0) {
 				for (j = 0; j < labelitem.childCount(); j++) {
 					fileitem = labelitem.child(j);
 					filename = fileitem.text(1);
+// 					Amarok.debug("   Label: " + filename);
 					if (fileitem.checkState(0) == Qt.Checked) {
 						mgr.addLabel(filename,label);
 					}
