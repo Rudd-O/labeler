@@ -27,7 +27,7 @@ try {
 	}
 } catch (e) {
 	Amarok.alert("This script requires that you get the Amarok QtScript library script first");
-	throw e;
+	end();
 }
 
 /*
@@ -199,7 +199,6 @@ function ManageLabels(filenames) {
 			}
 			else {
 				if (labelitem.checkState(0) == Qt.Checked) {
-// 					mgr.addLabelToManyFiles(label,filenames);
 					map ( function(f) { mgr.addLabel(f,label); } , filenames );
 				}
 				else if (labelitem.checkState(0) == Qt.PartiallyChecked) {
@@ -225,23 +224,30 @@ function ManageLabels(filenames) {
 	);
 	actionbuttonslayout.addWidget(removeButton,0,0);
 
-// 	exportButton = new QPushButton("&Export selected labels as playlists",actionbuttons);
-// 	function xExportLabels() {
-// 		items = listview.selectedItems();
-// 		for (i in items) {
-// 			label = items[i].text(0);
-// 			fs = mgr.getTracksLabeledAs(label);
-// 			Amarok.alert(fs.join("\n"));
-// 		}
-// 	}
-// 	exportButton.clicked.connect(
-// 		function() { try {
-// 			answer = Amarok.alert("Save changes to labels before exporting?","questionYesNo");
-// 			if (answer == 3) { save(); }
-// 			xExportLabels();
-// 		} catch (e) { Amarok.alert(e); } }
-// 	);
-// 	actionbuttonslayout.addWidget(exportButton,0,0);
+	exportButton = new QPushButton("&Export selected labels as playlists",actionbuttons);
+ 	function xExportLabels() {
+ 		items = listview.selectedItems();
+ 		for (i in items) {
+ 			var label = items[i].text(0);
+ 			var fs = mgr.getTracksLabeledAs(label);
+ 			var playlisttext = fs.join("\n");
+			var path = QDir.homePath() + "/" + label + ".m3u";
+			var file = new QFile(path);
+			file.open(QIODevice.WriteOnly);
+			var arr = new QByteArray(playlisttext);
+			file.write(arr);
+			file.close();
+			Amarok.alert("Track list saved to " + path);
+ 		}
+ 	}
+	exportButton.clicked.connect(
+ 		function() { try {
+ 			answer = Amarok.alert("Save changes to labels before exporting?","questionYesNo");
+ 			if (answer == 3) { save(); }
+ 			xExportLabels();
+ 		} catch (e) { Amarok.alert(e); } }
+ 	);
+ 	actionbuttonslayout.addWidget(exportButton,0,0);
 
 	buttonBox = new QDialogButtonBox(QDialogButtonBox.StandardButtons(QDialogButtonBox.Save|QDialogButtonBox.Discard),Qt.Horizontal,layout);
 	layout.addWidget(buttonBox,0,0);
