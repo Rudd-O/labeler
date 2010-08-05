@@ -19,16 +19,19 @@ Importer.loadQtBinding( "qt.core" );
 Importer.loadQtBinding( "qt.gui" );
 
 try {
-	if (!Importer.include("../amarokjslib/utils.js")) {
-		throw "Could not import amarokjslib/utils.js - aborting";
-	}
-	if (!Importer.include("../amarokjslib/LabelManager.js")) {
-		throw "Could not import amarokjslib/LabelManager.js - aborting";
+	if (!Importer.include("../amarokjslib/main.js")) {
+		throw "Could not import the Amarok QtScript library - aborting";
 	}
 } catch (e) {
-	Amarok.alert("This script requires that you get the Amarok QtScript library script first");
-	end();
+	Amarok.alert("This script requires that you get the Amarok QtScript library script first\nDetails: " + e);
+	Amarok.end();
 }
+if (!amarokjslib_satisfies_version || !amarokjslib_satisfies_version("0.1.1")) {
+	Amarok.alert("Quick labeler needs you to update to the latest version of the Amarok QtScript library");
+	Amarok.end();
+}
+	
+
 
 /*
 to-do
@@ -48,6 +51,7 @@ function ManageLabels(filenames) {
 	var mgr = new LabelManager();
 
 	labels = mgr.getLabels();
+	filenames = uniqueize(filenames);
 
 	mgr.warmupLabelCache(labels);
 	mgr.warmupFileCache(filenames);
