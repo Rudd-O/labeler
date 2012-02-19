@@ -40,7 +40,6 @@ make deletion and addition of labels be deferred until Save
 make the labeler gain the feature adding menu entries setting / clearing specific labels on songs
 make labels added to songs be represented in the playlist
 make labeler search for specific labeled songs in the collection browser / add to playlist / replace playlist
-make labeler generate m3u playlists
 make decorator so as to avoid the try catch everywhere: http://www.sitepoint.com/blogs/2008/11/11/arguments-a-javascript-oddity/
 */
 
@@ -234,6 +233,7 @@ function ManageLabels(filenames) {
  		for (i in items) {
  			var label = items[i].text(0);
  			var fs = mgr.getTracksLabeledAs(label);
+                        fs = filter( function(x) { var z = new QFile(x); return z.exists(); } , fs );
  			var playlisttext = fs.join("\n");
 			var path = QDir.homePath() + "/" + label + ".m3u";
 			var file = new QFile(path);
