@@ -1,5 +1,7 @@
 This script lets you manage labels of the tracks in your playlist very quickly.  It is optimized for both keyboard and mouse operation.
 
+This script requires the installation of the Amarok JS library (available through Get Hot New Stuff and at https://github.com/Rudd-O/amarokjslib).
+
 To use it, select a few tracks in your playlist, click the Tools menu, and select Manage labels on selected tracks.  A dialog will open with a list of labels that you can check or uncheck.  Check or uncheck the checkboxes on the labels to add / remove labels on the selected tracks.  You can also expand a label to modify the labels on particular tracks.
 
 -------------------------------
